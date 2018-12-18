@@ -344,8 +344,12 @@ def get_role_arn(role_params):
 @log_exec_time
 def get_assumed_role(role_params):
     arn = get_role_arn(role_params)
-    if arn in ROLES:
-        assumed_role = ROLES[arn]
+    session_name = role_params['session_name'] or 'devproxyauth'
+
+    role_alias = "--".join([session_name, arn])
+
+    if role_alias in ROLES:
+        assumed_role = ROLES[role_alias]
         expiration = assumed_role['Credentials']['Expiration']
         now = datetime.datetime.now(dateutil.tz.tzutc())
         expire_check = now + datetime.timedelta(minutes=app.config['ROLE_EXPIRATION_THRESHOLD'])
@@ -353,12 +357,11 @@ def get_assumed_role(role_params):
             return assumed_role
     with PrintingBlockTimer('sts.assume_role'):
         sts = sts_client()
-        session_name = role_params['session_name'] or 'devproxyauth'
         kwargs = {'RoleArn': arn, 'RoleSessionName': session_name}
         if role_params['external_id']:
             kwargs['ExternalId'] = role_params['external_id']
         assumed_role = sts.assume_role(**kwargs)
-    ROLES[arn] = assumed_role
+    ROLES[role_alias] = assumed_role
     return assumed_role
 
 
